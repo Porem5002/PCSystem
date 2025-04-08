@@ -1,22 +1,27 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-#include "pcsystem/pcsystem.hpp"
-
-#include <stdio.h>
-#include <io.h>
-#include <fcntl.h>
+#include "shared.hpp"
 
 DWORD WINAPI consume(void* data)
 {
-	PCSystem* pc = (PCSystem*)data;
+	ThreadData* threadData = (decltype(threadData))data;
+
+	ProducerConsumer* pc = threadData->pc;
+	HANDLE hMutexUserData = threadData->hUserDataMutex;
 
 	int con_count = 0;
 	int con_sum = 0;
-	int con_id = pc->getNewConsumerId();
+
+	UserData* user_data = pc->getUserData();
+	WaitForSingleObject(hMutexUserData, INFINITE);
+	int con_id = user_data->nconsumers++;
+	ReleaseMutex(hMutexUserData);
+
+	_tprintf(_T("Consumer C%d started...\n"), con_id);
 
 	while(true)
 	{
-		const PCItem* pItem;
+		const Item* pItem;
 		PCRequestStatus status = pc->requestConsumptionSlot(&pItem);
 		if(status == PCRequestStatus::NO_MORE) break;
 			
@@ -35,19 +40,27 @@ DWORD WINAPI consume(void* data)
 
 int _tmain(int argc, const TCHAR** argv)
 {
-#ifdef _UNICODE
-	(void)_setmode(_fileno(stdin), _O_WTEXT);
-	(void)_setmode(_fileno(stdout), _O_WTEXT);
-	(void)_setmode(_fileno(stderr), _O_WTEXT);
-#endif
-	PCSystem pc;
+	set_correct_char_io_mode();
+
+	ProducerConsumer pc;
 	if(!pc.init())
 	{
 		_tprintf(_T("Não foi possível inicializar o sistema produtor-consumidor!\n"));
 		ExitProcess(1);
 	}
 	
-	HANDLE hThread = CreateThread(NULL, 0, consume, &pc, 0, NULL);
+	HANDLE hUserDataMutex = CreateMutex(NULL, FALSE, USER_DATA_MUTEX_NAME);
+	if(hUserDataMutex == NULL)
+	{
+		_tprintf(_T("Não foi possível criar o mutex para user data!\n"));
+		ExitProcess(1);
+	}
+
+	ThreadData threadData = {};
+	threadData.pc = &pc;
+	threadData.hUserDataMutex = hUserDataMutex;
+
+	HANDLE hThread = CreateThread(NULL, 0, consume, &threadData, 0, NULL);
 	if(hThread == NULL)
 	{
 		pc.cleanup();

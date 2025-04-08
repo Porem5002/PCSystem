@@ -4,10 +4,7 @@ project(pcsystem)
 
 add_compile_definitions("UNICODE" "_UNICODE")
 
-add_library(pcsystem STATIC "pcsystem/pcsystem.hpp" "pcsystem/pcsystem.cpp")
+set(SHARED_SOURCES "src/pcsystem/pcsystem.hpp" "src/shared.hpp" "src/shared.cpp")
 
-add_executable(produtor "produtor.cpp")
-target_link_libraries(produtor PUBLIC pcsystem)
-
-add_executable(consumidor "consumidor.cpp")
-target_link_libraries(consumidor PUBLIC pcsystem)
+add_executable(produtor ${SHARED_SOURCES} "src/produtor.cpp")
+add_executable(consumidor ${SHARED_SOURCES} "src/consumidor.cpp")
